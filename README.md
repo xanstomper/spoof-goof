@@ -1,4 +1,4 @@
-# SPOF
+# Spoof Goof
 
 operational security suite for red teaming. one binary, full protection.
 
@@ -6,7 +6,7 @@ i got tired of juggling 15 different tools, configs, and scripts every time i wa
 
 ## what this actually does
 
-SPOF chains together multiple layers of protection so you don't have to think about them individually. when you run `spoof`, it:
+Spoof Goof chains together multiple layers of protection so you don't have to think about them individually. when you run `spoof`, it:
 
 1. spins up VPN rotation through VPNGate (6000+ free servers, auto-rotates every 5 minutes)
 2. routes traffic through Tor via proxychains4
@@ -43,7 +43,7 @@ i'm not a corporation. i'm one person who needed this to work, so i built it to 
 
 ## how the honeypot detection works
 
-this is the part i'm most proud of. before you engage a target, SPOF runs an 8-point scan to figure out if you're walking into a trap:
+this is the part i'm most proud of. before you engage a target, Spoof Goof runs an 8-point scan to figure out if you're walking into a trap:
 
 - **port scanning** — finds open ports, checks for SSH honeypot banners (cowrie, kippo, dionaea, etc.)
 - **service fingerprinting** — detects mixed OS services (windows + linux on same box = red flag)
@@ -96,7 +96,7 @@ the TUI uses arrow keys / j/k to navigate, enter to select, q to quit. each menu
 ## installation
 
 ```bash
-git clone https://github.com/xanstomper/spof.git
+git clone https://github.com/xanstomper/spoof-goof.git
 cd spof
 
 # install the binary
@@ -114,7 +114,7 @@ or just run individual scripts as needed — they all work standalone.
 
 ## kernel hardening
 
-SPOF applies these sysctl parameters on setup:
+Spoof Goof applies these sysctl parameters on setup:
 
 ```
 net.ipv4.conf.all.accept_redirects = 0      # no ICMP redirects (MITM prevention)
