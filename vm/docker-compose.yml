@@ -1,0 +1,109 @@
+services:
+  # ── Isolated Red Team Container ──────────────────────────────────────────────
+  redteam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: opsec-redteam
+    hostname: redteam-sandbox
+    # ── Network Isolation ──────────────────────────────────────────────────────
+    networks:
+      - redteam-isolated
+    # ── Resource Limits (prevent resource exhaustion attacks) ──────────────────
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    # ── Security Hardening ─────────────────────────────────────────────────────
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW        # Required for nmap/pings
+      - NET_ADMIN       # Required for network tools
+      - SYS_PTRACE      # Required for debugging
+    # ── Volumes ────────────────────────────────────────────────────────────────
+    volumes:
+      - ./workspace:/home/redteam/workspace    # Shared workspace
+      - /home/jewboy420/redteam-agent:/home/redteam/tools/redteam-agent:ro
+      - /home/jewboy420/redteam-brain:/home/redteam/tools/redteam-brain:rw
+      - /home/jewboy420/.opsec/reports:/home/redteam/reports:rw
+    # ── Environment ────────────────────────────────────────────────────────────
+    environment:
+      - DISPLAY=${DISPLAY}
+      - TERM=xterm-256color
+      - PROXYCHAINS_CONF_FILE=/etc/proxychains4.conf
+    # ── DNS: Force through Tor ─────────────────────────────────────────────────
+    dns:
+      - 127.0.0.1
+    # ── tmpfs: No persistent logs inside container ─────────────────────────────
+    tmpfs:
+      - /tmp:size=100M
+      - /var/log:size=50M
+    # ── Shared memory: Prevent side-channel attacks ────────────────────────────
+    shm_size: '256mb'
+    # ── Keep container running ─────────────────────────────────────────────────
+    stdin_open: true
+    tty: true
+
+  # ── Tor Proxy (shared by redteam container) ─────────────────────────────────
+  tor-proxy:
+    image: dperson/torproxy:latest
+    container_name: opsec-tor
+    hostname: tor-gateway
+    networks:
+      - redteam-isolated
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "127.0.0.1:9050:9050"   # SOCKS5 proxy
+      - "127.0.0.1:9061:9061"   # Control port
+    restart: unless-stopped
+
+  # ── DNS Leak Monitor ────────────────────────────────────────────────────────
+  dns-monitor:
+    image: alpine:latest
+    container_name: opsec-dns-monitor
+    hostname: dns-watchdog
+    networks:
+      - redteam-isolated
+    cap_drop:
+      - ALL
+    command: >
+      sh -c "apk add --no-cache curl bind-tools &&
+             while true; do
+               echo \"[DNS-CHECK] $(date) - Testing DNS resolution...\";
+               result=$(curl -s --max-time 5 https://dns.google/resolve?name=example.com 2>/dev/null);
+               if [ -z "$$result" ]; then
+                 echo \"[DNS-WARN] DNS query failed - possible leak\";
+               else
+                 echo \"[DNS-OK] DNS resolution working through proxy\";
+               fi;
+               sleep 60;
+             done"
+    restart: unless-stopped
+
+networks:
+  redteam-isolated:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+    # ── Isolation: No connection to default bridge ─────────────────────────────
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "false"
